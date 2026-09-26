@@ -782,8 +782,10 @@ extension HIDEventManager {
             let items = appState.itemManager.itemCache.managedItems.map { item in
                 ItemHitTest27.Item(frame: item.bounds, ownerPID: item.ownerPID, isOnScreen: item.isOnScreen)
             }
+            // On the display whose bar is not active only MenuBarAgent describes the items.
             let systemFrames = MenuBarItemProvider27.systemItemFrames()
                 + [MenuBarItemProvider27.overflowButtonFrame()].compactMap { $0 }
+                + MenuBarItemProvider27.inactiveDisplayItemFrames(for: screen.displayID)
             return ItemHitTest27.isInsideItem(
                 point: mouseLocation,
                 items: items,

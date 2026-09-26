@@ -55,6 +55,9 @@ enum MenuBarItemProvider27 {
     /// menu bar was active. Hover hit-testing needs it for the display that is not active,
     /// where Accessibility reports no frames at all.
     nonisolated(unsafe) private static var lastLeftEdges = [CGDirectDisplayID: CGFloat]()
+    /// Frames of everything drawn on each display whose menu bar is not active, from
+    /// MenuBarAgent's window there, which holds every item drawn on that bar.
+    nonisolated(unsafe) private static var lastInactiveFramesByDisplay = [CGDirectDisplayID: [CGRect]]()
     /// Processes whose items are concealed. Accessibility keeps reporting their frames where
     /// they were last drawn, so without this they would pass for drawn items.
     nonisolated(unsafe) private static var concealedPIDs = Set<pid_t>()
@@ -149,6 +152,12 @@ enum MenuBarItemProvider27 {
     /// is why that clock used to need two or three clicks.
     static func systemItemFrames(for displayID: CGDirectDisplayID) -> [CGRect] {
         lock.withLock { lastSystemFramesByDisplay[displayID] ?? [] }
+    }
+
+    /// Frames of the items drawn on the given display while its menu bar is not active, from
+    /// the last read. Empty for the display with the active menu bar.
+    static func inactiveDisplayItemFrames(for displayID: CGDirectDisplayID) -> [CGRect] {
+        lock.withLock { lastInactiveFramesByDisplay[displayID] ?? [] }
     }
 
     /// Frame of the system overflow button ("<<" / ">>"), from the last read.
@@ -276,7 +285,22 @@ enum MenuBarItemProvider27 {
                     }
                     return frames.filter { $0.minX >= clock.minX - systemItemsSpan }
                 }
-                lock.withLock { lastSystemFramesByDisplay = perDisplay }
+                // On a bar that is not active, MenuBarAgent's window is the only description of
+                // the drawn items, and it is current, so it also gives that bar's left edge.
+                // Ice's own collapsed items report no width and are left out.
+                let inactive = framesByDisplay
+                    .filter { $0.key != activeDisplayID }
+                    .mapValues { $0.filter { $0.width > 4 } }
+                    .filter { !$0.value.isEmpty }
+                lock.withLock {
+                    lastSystemFramesByDisplay = perDisplay
+                    lastInactiveFramesByDisplay = inactive
+                    for (display, frames) in inactive {
+                        if let edge = frames.map(\.minX).min() {
+                            lastLeftEdges[display] = edge
+                        }
+                    }
+                }
                 let systemFrames = rawItems
                     .filter { $0.bundleID == menuBarAgentBundleID && (activeDisplayBounds?.intersects($0.frame) ?? true) }
                     .map(\.frame)

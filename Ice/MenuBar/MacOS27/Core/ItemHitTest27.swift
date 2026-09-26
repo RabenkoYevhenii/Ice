@@ -10,8 +10,8 @@ import Darwin
 ///
 /// There are no item windows on macOS 27, so the test uses the Accessibility
 /// frames Ice cached for the drawn items, plus the system items and the overflow
-/// button. Accessibility reports frames only for the active menu bar, so on the
-/// other display every spot counts as empty, as it did in earlier versions of Ice.
+/// button. Accessibility reports application frames only for the active menu bar; on
+/// the other display the frames come from MenuBarAgent's window there instead.
 enum ItemHitTest27 {
     struct Item: Equatable {
         let frame: CGRect
