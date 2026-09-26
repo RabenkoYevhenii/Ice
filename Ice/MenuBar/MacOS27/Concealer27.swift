@@ -142,7 +142,7 @@ final class Concealer27 {
             await task.value
             try? await Task.sleep(for: .milliseconds(400))
             await self?.appState?.itemManager.cacheItemsIfNeeded()
-            await self?.nudgeStuckOverflowIfNeeded()
+            await self?.logStuckOverflowIfNeeded()
         }
     }
 
@@ -286,17 +286,17 @@ final class Concealer27 {
 
     // MARK: Private
 
-    /// When the notched bar's overflow was last nudged.
-    private var lastNudgeAt: ContinuousClock.Instant?
+    /// When a stuck overflow was last logged.
+    private var lastStuckLogAt: ContinuousClock.Instant?
 
-    /// Lays the notched bar out again when concealment left its items folded with no
+    /// Logs when concealment seems to have left the notched bar's items folded with no
     /// overflow button (see `StuckOverflow27`).
     ///
-    /// A status item that appears, changes width and goes away makes MenuBarAgent lay the bar
-    /// out again, the way recreating an item does. Whether that is enough to unfold the stuck
-    /// items is not measured yet, because the state stopped reproducing (see
-    /// `Scripts/macos27/reflow-probe.swift`), so each nudge logs what it found and what came of it.
-    private func nudgeStuckOverflowIfNeeded() async {
+    /// Nothing is done about it yet. Accessibility keeps the frames of items that are no longer
+    /// drawn, so the check can mistake one of those for a folded item; acting on it would make the
+    /// bar lay itself out again for nothing. The log shows whether the check holds up the next
+    /// time the state turns up (see `Scripts/macos27/reflow-probe.swift`).
+    private func logStuckOverflowIfNeeded() async {
         guard
             let screen = NSScreen.screenWithActiveMenuBar,
             screen.hasNotch,
@@ -304,19 +304,11 @@ final class Concealer27 {
         else {
             return
         }
-        if let lastNudgeAt, ContinuousClock.now - lastNudgeAt < .seconds(10) {
+        if let lastStuckLogAt, ContinuousClock.now - lastStuckLogAt < .seconds(10) {
             return
         }
-        lastNudgeAt = .now
-        logger.notice("Notched bar looks stuck with folded items and no overflow button, nudging its layout")
-        let item = NSStatusBar.system.statusItem(withLength: 1)
-        try? await Task.sleep(for: .milliseconds(500))
-        item.length = 40
-        try? await Task.sleep(for: .milliseconds(500))
-        NSStatusBar.system.removeStatusItem(item)
-        try? await Task.sleep(for: .milliseconds(800))
-        let stillStuck = isStuckOverflow(on: screen, items: await MenuBarItemProvider27.items())
-        logger.notice("Notched bar nudge done, still stuck: \(stillStuck, privacy: .public)")
+        lastStuckLogAt = .now
+        logger.notice("Notched bar looks stuck with folded items and no overflow button")
     }
 
     private func isStuckOverflow(on screen: NSScreen, items: [MenuBarItem]) -> Bool {
