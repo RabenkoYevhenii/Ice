@@ -142,6 +142,7 @@ final class Concealer27 {
             await task.value
             try? await Task.sleep(for: .milliseconds(400))
             await self?.appState?.itemManager.cacheItemsIfNeeded()
+            await self?.nudgeStuckOverflowIfNeeded()
         }
     }
 
@@ -284,6 +285,57 @@ final class Concealer27 {
     }
 
     // MARK: Private
+
+    /// When the notched bar's overflow was last nudged.
+    private var lastNudgeAt: ContinuousClock.Instant?
+
+    /// Lays the notched bar out again when concealment left its items folded with no
+    /// overflow button (see `StuckOverflow27`).
+    ///
+    /// A status item that appears, changes width and goes away makes MenuBarAgent lay the bar
+    /// out again, the way recreating an item does. Whether that is enough to unfold the stuck
+    /// items is not measured yet, because the state stopped reproducing (see
+    /// `Scripts/macos27/reflow-probe.swift`), so each nudge logs what it found and what came of it.
+    private func nudgeStuckOverflowIfNeeded() async {
+        guard
+            let screen = NSScreen.screenWithActiveMenuBar,
+            screen.hasNotch,
+            isStuckOverflow(on: screen, items: await MenuBarItemProvider27.items())
+        else {
+            return
+        }
+        if let lastNudgeAt, ContinuousClock.now - lastNudgeAt < .seconds(10) {
+            return
+        }
+        lastNudgeAt = .now
+        logger.notice("Notched bar looks stuck with folded items and no overflow button, nudging its layout")
+        let item = NSStatusBar.system.statusItem(withLength: 1)
+        try? await Task.sleep(for: .milliseconds(500))
+        item.length = 40
+        try? await Task.sleep(for: .milliseconds(500))
+        NSStatusBar.system.removeStatusItem(item)
+        try? await Task.sleep(for: .milliseconds(800))
+        let stillStuck = isStuckOverflow(on: screen, items: await MenuBarItemProvider27.items())
+        logger.notice("Notched bar nudge done, still stuck: \(stillStuck, privacy: .public)")
+    }
+
+    private func isStuckOverflow(on screen: NSScreen, items: [MenuBarItem]) -> Bool {
+        let displayBounds = CGDisplayBounds(screen.displayID)
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let frames = items
+            .filter { !concealedPIDs.contains($0.ownerPID) && $0.ownerPID != ownPID && displayBounds.intersects($0.bounds) }
+            .map(\.bounds)
+        let notch = StuckOverflow27.notchSpan(
+            displayBounds: displayBounds,
+            leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
+            rightAreaWidth: screen.auxiliaryTopRightArea?.width
+        )
+        return StuckOverflow27.isStuck(
+            visibleItemFrames: frames,
+            chevronFrame: MenuBarItemProvider27.overflowButtonFrame(),
+            notchSpan: notch
+        )
+    }
 
     private func revealState(_ appState: AppState) -> RevealState27 {
         let navigation = appState.navigationState
