@@ -59,8 +59,10 @@ final class MenuBarAssessmentAssertion27: ConcealmentBackend27 {
     private static let activateSelector = NSSelectorFromString("activateWithConfiguration:completionHandler:")
     private static let invalidateSelector = NSSelectorFromString("invalidate")
 
-    /// MenuBarAgent numbers its system items 0 through 8 on macOS 27.0. Ice keeps all of them.
-    private static let systemItems = (0...8).map { NSNumber(value: $0) } as NSArray
+    /// MenuBarAgent numbers its system items 0 through 8 on macOS 27.0. Ice keeps all of them,
+    /// and allows numbers well past 8 so that items a later macOS adds are not hidden: numbers
+    /// with no item behind them are ignored (measured on macOS 27.0 with 0 through 63).
+    private static let systemItems = (0...63).map { NSNumber(value: $0) } as NSArray
 
     private static let classes: (configuration: AnyClass, assertion: AnyClass)? = {
         guard
