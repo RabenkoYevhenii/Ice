@@ -263,6 +263,58 @@ final class Concealer27 {
         }
     }
 
+    /// Writes the sections the bar still holds from before macOS 27 into the saved layout, once.
+    ///
+    /// Nothing recorded them before: an item's section was where it sat between Ice's dividers.
+    /// On 27 that order no longer means anything, and an application missing from the layout is
+    /// visible, so without this an upgrade left Ice hiding nothing until the whole layout was
+    /// rebuilt by hand — reported on jordanbaird/Ice#1006, and the likeliest reading of several
+    /// "Ice hides nothing on 27" issues.
+    ///
+    /// The bar is read once, the first time it can be: a user who has arranged a layout of their
+    /// own keeps it, and a bar whose order macOS 27 has already rearranged is left alone (see
+    /// ``SectionLayout27/seededLayout(items:hiddenControlItem:alwaysHiddenControlItem:)``).
+    func seedLayoutIfNeeded(items: [MenuBarItem]) {
+        guard
+            !Defaults.bool(forKey: .macOS27LayoutSeeded),
+            savedLayout.isEmpty,
+            !isConcealing,
+            let hiddenControlItem = items.first(where: { $0.tag == .hiddenControlItem })
+        else {
+            return
+        }
+        // Once the bar can be read, this runs whatever it says: a bar that says nothing is still
+        // an answer, and asking it again later would risk reading one Ice itself had concealed.
+        Defaults.set(true, forKey: .macOS27LayoutSeeded)
+        let alwaysHiddenControlItem = items.first { $0.tag == .alwaysHiddenControlItem }
+        let managed = items.compactMap { item -> (bundleID: String, bounds: CGRect)? in
+            guard
+                item.canBeHidden,
+                !item.isSystemClone,
+                !item.isControlItem,
+                let bundleID = item.sourceApplication?.bundleIdentifier
+            else {
+                return nil
+            }
+            return (bundleID, item.bounds)
+        }
+        guard let seeded = SectionLayout27.seededLayout(
+            items: managed,
+            hiddenControlItem: hiddenControlItem.bounds,
+            alwaysHiddenControlItem: alwaysHiddenControlItem?.bounds
+        ) else {
+            logger.notice("The bar's order says nothing about sections, so the macOS 27 layout stays empty")
+            return
+        }
+        Defaults.set(seeded.mapValues(\.rawValue), forKey: .macOS27Layout)
+        let described = seeded
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value.rawValue)" }
+            .joined(separator: " ")
+        logger.notice("Took the macOS 27 layout from the order on the bar: \(described, privacy: .public)")
+        update()
+    }
+
     /// Builds the item cache from the saved layout rather than the order on the bar.
     func cacheFromSavedLayout(items: [MenuBarItem], displayID: CGDirectDisplayID?) -> MenuBarItemManager.ItemCache {
         var cache = MenuBarItemManager.ItemCache(displayID: displayID)

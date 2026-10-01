@@ -168,6 +168,7 @@ extension Defaults {
 
         // MARK: macOS 27
         case macOS27Layout = "MacOS27Layout"
+        case macOS27LayoutSeeded = "MacOS27LayoutSeeded"
         case macOS27ClickRestoreDelay = "MacOS27ClickRestoreDelay"
         case macOS27IceBarWaitsForRefresh = "MacOS27IceBarWaitsForRefresh"
 
