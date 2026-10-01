@@ -2,7 +2,7 @@
 
 A build of [PR #995](https://github.com/jordanbaird/Ice/pull/995), which restores hiding, the Ice
 Bar and the Menu Bar Layout editor on macOS 27. Built from
-[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `d1858fb`,
+[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `15f59a9`,
 version `0.11.13-dev.2a (1121)`.
 
 This is not an official Ice release and does not come from Ice's maintainer. It is a preview for
@@ -14,7 +14,7 @@ people who want to try the branch without building it themselves.
 
 The order matters: **move the app before you open it.**
 
-1. Download `Ice-macOS27-preview-3.zip` and unzip it.
+1. Download `Ice-macOS27-preview-4.zip` and unzip it.
 2. **Move `Ice.app` into your Applications folder first.** Opened straight from Downloads, macOS
    runs it from a random temporary copy, permissions never stick to it, and it looks broken.
    If you already run Ice, quit it and replace it with this one — your settings stay where they
@@ -35,11 +35,18 @@ The order matters: **move the app before you open it.**
    other. Grant them again for this one. When you go back to your own build, expect to grant them
    there again too.
 
+6. **Turn off automatic updates**, or Ice will replace this build with the newest official
+   release — the one that does not work on macOS 27:
+
+   ```
+   defaults write com.jordanbaird.Ice SUAutomaticallyUpdate -bool false
+   ```
+
 Verifying the download, if you like:
 
 ```
-shasum -a 256 Ice-macOS27-preview-3.zip
-# c8f5657f937009689bd3d14458dc1f07897c82964cdbbd3acf6dcdc8735a6b66
+shasum -a 256 Ice-macOS27-preview-4.zip
+# fbd05024ee0552a2fcd1c484bc33622c701ac5e55c326ecc25afaf1899fb9a85
 ```
 
 ## What works on macOS 27
@@ -53,8 +60,11 @@ shasum -a 256 Ice-macOS27-preview-3.zip
 ## What to expect, honestly
 
 - **Ice's own icon disappears while anything is hidden.** While the hiding is in force macOS keeps
-  only items of applications signed with a Developer ID on the bar, and this build is signed ad
-  hoc. Reveal with hover instead, or bind a hotkey. Hiding itself is unaffected.
+  only items of applications it trusts on the bar — notarized ones, as far as anyone has measured —
+  and this build is signed ad hoc. @carlossantos74 measured on
+  [#1001](https://github.com/jordanbaird/Ice/pull/1001) that an unnotarized Developer ID signature
+  does not bring the item back either. Reveal with hover instead, or bind a hotkey. Hiding itself
+  is unaffected.
 - **Opening the clock, battery or Wi-Fi panel takes roughly 150 ms longer** than with Ice not
   running. macOS ignores clicks on those while items are hidden, so Ice lifts the hiding for a
   moment and replays the click. Dismissing a panel costs nothing.
