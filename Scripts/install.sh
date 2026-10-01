@@ -17,8 +17,15 @@ DEST="${DEST:-$HOME/Applications}"
 DERIVED="${DERIVED:-/tmp/ice-build}"
 
 echo "==> Building"
+# The hardened runtime is turned off on purpose. Without an Apple developer team Xcode signs the
+# app ad hoc, and the hardened runtime then refuses to load Sparkle, which carries a team of its
+# own: "mapping process and mapped file (non-platform) have different Team IDs". `codesign
+# --verify --deep --strict` passes all the same, so the script used to install a bundle that
+# could not launch for anyone without a team (reported on jordanbaird/Ice#1006 by @Theralley).
+# A copy installed from here is run by its builder, not distributed, so it loses nothing by it.
 xcodebuild -project "$ROOT/Ice.xcodeproj" -scheme Ice -configuration Release \
     -destination 'platform=macOS' -derivedDataPath "$DERIVED" build \
+    ENABLE_HARDENED_RUNTIME=NO \
     | tail -3
 
 APP="$DERIVED/Build/Products/Release/Ice.app"
