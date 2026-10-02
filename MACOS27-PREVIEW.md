@@ -2,7 +2,7 @@
 
 A build of [PR #995](https://github.com/jordanbaird/Ice/pull/995), which restores hiding, the Ice
 Bar and the Menu Bar Layout editor on macOS 27. Built from
-[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `15f59a9`,
+[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `63036af`,
 version `0.11.13-dev.2a (1121)`.
 
 This is not an official Ice release and does not come from Ice's maintainer. It is a preview for
@@ -14,7 +14,7 @@ people who want to try the branch without building it themselves.
 
 The order matters: **move the app before you open it.**
 
-1. Download `Ice-macOS27-preview-4.zip` and unzip it.
+1. Download `Ice-macOS27-preview-5.zip` and unzip it.
 2. **Move `Ice.app` into your Applications folder first.** Opened straight from Downloads, macOS
    runs it from a random temporary copy, permissions never stick to it, and it looks broken.
    If you already run Ice, quit it and replace it with this one — your settings stay where they
@@ -45,8 +45,8 @@ The order matters: **move the app before you open it.**
 Verifying the download, if you like:
 
 ```
-shasum -a 256 Ice-macOS27-preview-4.zip
-# fbd05024ee0552a2fcd1c484bc33622c701ac5e55c326ecc25afaf1899fb9a85
+shasum -a 256 Ice-macOS27-preview-5.zip
+# 6025694552cab7858286d036f0ea87c5861f19df7b5f10d69ee2ace3a939b3ef
 ```
 
 ## What works on macOS 27
@@ -70,9 +70,13 @@ shasum -a 256 Ice-macOS27-preview-4.zip
   moment and replays the click. Dismissing a panel costs nothing.
 - **Items cannot be dragged around the bar.** macOS 27 arranges them itself; which section an
   application belongs to comes from a saved layout instead of its position.
-- **On a MacBook's built-in display**, items that macOS folded away before Ice started can stay
-  folded after Ice frees the space, with no "«" left to reach them. Relaunching the application
-  whose item is missing brings it back.
+- **On a MacBook, plugging a display in can empty the built-in display's menu bar.** macOS lays
+  the bar out again, drops the items that do not fit beside the notch, and leaves no "«" to reach
+  them; relaunching the application whose item is missing brings it back. This is not Ice's doing —
+  with Ice quit, unplugging a second display and plugging it back leaves that bar with the system
+  items and nothing else — but Ice decides which losses you notice, since the items it hides are
+  not missed. Ice now says so in **Menu Bar Layout**, with a button to relaunch each application
+  that belongs on that bar.
 - **Control Centre's camera button is not drawn while items are hidden.** The green camera — orange
   for the microphone, indigo for screen sharing — is not one of the system items the hiding can
   spare: every number up to 127 was tried, along with Control Centre's own bundle identifier and
