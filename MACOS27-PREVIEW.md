@@ -2,7 +2,7 @@
 
 A build of [PR #995](https://github.com/jordanbaird/Ice/pull/995), which restores hiding, the Ice
 Bar and the Menu Bar Layout editor on macOS 27. Built from
-[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `63036af`,
+[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `4f1d700`,
 version `0.11.13-dev.2a (1121)`.
 
 This is not an official Ice release and does not come from Ice's maintainer. It is a preview for
@@ -14,7 +14,7 @@ people who want to try the branch without building it themselves.
 
 The order matters: **move the app before you open it.**
 
-1. Download `Ice-macOS27-preview-5.zip` and unzip it.
+1. Download `Ice-macOS27-preview-6.zip` and unzip it.
 2. **Move `Ice.app` into your Applications folder first.** Opened straight from Downloads, macOS
    runs it from a random temporary copy, permissions never stick to it, and it looks broken.
    If you already run Ice, quit it and replace it with this one — your settings stay where they
@@ -45,8 +45,8 @@ The order matters: **move the app before you open it.**
 Verifying the download, if you like:
 
 ```
-shasum -a 256 Ice-macOS27-preview-5.zip
-# 6025694552cab7858286d036f0ea87c5861f19df7b5f10d69ee2ace3a939b3ef
+shasum -a 256 Ice-macOS27-preview-6.zip
+# efa9689bc6e870bd433dffeb74b0f9d13c1eca9a13809bab1fc0dfd924506b19
 ```
 
 ## What works on macOS 27
