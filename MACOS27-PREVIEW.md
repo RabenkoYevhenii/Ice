@@ -2,7 +2,7 @@
 
 A build of [PR #995](https://github.com/jordanbaird/Ice/pull/995), which restores hiding, the Ice
 Bar and the Menu Bar Layout editor on macOS 27. Built from
-[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `b1de0c8`,
+[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `90fa768`,
 version `0.11.13-dev.2a (1121)`.
 
 This is not an official Ice release and does not come from Ice's maintainer. It is a preview for
@@ -14,7 +14,7 @@ people who want to try the branch without building it themselves.
 
 The order matters: **move the app before you open it.**
 
-1. Download `Ice-macOS27-preview-7.zip` and unzip it.
+1. Download `Ice-macOS27-preview-8.zip` and unzip it.
 2. **Move `Ice.app` into your Applications folder first.** Opened straight from Downloads, macOS
    runs it from a random temporary copy, permissions never stick to it, and it looks broken.
    If you already run Ice, quit it and replace it with this one — your settings stay where they
@@ -45,8 +45,8 @@ The order matters: **move the app before you open it.**
 Verifying the download, if you like:
 
 ```
-shasum -a 256 Ice-macOS27-preview-7.zip
-# 5091e8f099f116600921ca9c821125f3dc73a1057dde8d56796b205177e498c0
+shasum -a 256 Ice-macOS27-preview-8.zip
+# 1a3f0532a3273a4dc3f275904607ad2e4c84935b86ba241d2516f8864ff754d8
 ```
 
 ## Building it yourself
@@ -83,11 +83,14 @@ is one on the Mac and ad hoc if there is not, so no developer account is needed;
   items and nothing else — but Ice decides which losses you notice, since the items it hides are
   not missed. Ice now says so in **Menu Bar Layout**, with a button to relaunch each application
   that belongs on that bar.
-- **Control Centre's camera button is not drawn while items are hidden.** The green camera — orange
-  for the microphone, indigo for screen sharing — is not one of the system items the hiding can
-  spare: every number up to 127 was tried, along with Control Centre's own bundle identifier and
-  the capturing application's. It comes back the moment everything is revealed, and the small green
-  dot beside the clock, which is not an item, stays throughout.
+- **Control Centre's camera button is not drawn while items are hidden**, and no allowlist can
+  spare it: every system item number up to 127 was tried, along with Control Centre's own bundle
+  identifier and the capturing application's. Ice draws one of its own instead — a green camera, or
+  orange for the microphone — beside the items on the active bar, and clicking it opens the real
+  controls. That click lifts the hiding for about a quarter of a second, because the module it
+  presses does not exist while anything is concealed; the hidden items flash past in that moment.
+  Turn the indicator off in **Advanced → Menu Bar Indicators** if you would rather it was not there.
+  The small green dot beside the clock is not an item and shows throughout either way.
 - Search, item spacing and hiding the application menus are off on macOS 27.
 - Tested on macOS 27.0 with a built-in and an external display. On macOS 26 it should behave like
   Ice's own `macos-26` branch, but that is not tested here.
