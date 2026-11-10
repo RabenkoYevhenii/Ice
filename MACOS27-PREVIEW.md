@@ -2,7 +2,7 @@
 
 A build of [PR #995](https://github.com/jordanbaird/Ice/pull/995), which restores hiding, the Ice
 Bar and the Menu Bar Layout editor on macOS 27. Built from
-[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `1db1912`,
+[`macos-27-support`](https://github.com/RabenkoYevhenii/Ice/tree/macos-27-support) at `37d3c30`,
 version `0.11.13-dev.2a (1121)`.
 
 This is not an official Ice release and does not come from Ice's maintainer. It is a preview for
@@ -14,7 +14,7 @@ people who want to try the branch without building it themselves.
 
 The order matters: **move the app before you open it.**
 
-1. Download `Ice-macOS27-preview-17.zip` and unzip it.
+1. Download `Ice-macOS27-preview-18.zip` and unzip it.
 2. **Move `Ice.app` into your Applications folder first.** Opened straight from Downloads, macOS
    runs it from a random temporary copy, permissions never stick to it, and it looks broken.
    If you already run Ice, quit it and replace it with this one. Your settings stay where they
@@ -45,8 +45,8 @@ The order matters: **move the app before you open it.**
 Verifying the download:
 
 ```
-shasum -a 256 Ice-macOS27-preview-17.zip
-# dc54f6359c2105de2933dfb1fa6875d70f95bdc347dba72082b2836edea7b9bf
+shasum -a 256 Ice-macOS27-preview-18.zip
+# cd02d3ce640041e6d67df1c21972ec64e713318d15760f4eb9c7bbbcb67f7fea
 ```
 
 ## What works on macOS 27
@@ -81,11 +81,11 @@ shasum -a 256 Ice-macOS27-preview-17.zip
   them. This is not Ice's doing: with Ice quit, unplugging a second display and plugging it back
   leaves that bar with the system items and nothing else.
 
-  Two things bring the items back. `killall MenuBarAgent` restarts the process that draws the bar,
-  which comes back on its own in about a second, and clears the state where macOS refuses to draw
-  an item at all. Measured once, on a bar missing ten items: all ten returned, and relaunching the
-  applications themselves had not helped. Relaunching the application that owns the missing item
-  also works, and **Menu Bar Layout** offers a button for it.
+  Two things bring the items back, both buttons in **Menu Bar Layout**. Restarting the menu bar is
+  the one to try first: it restarts the process that draws the bar, which comes back on its own in
+  about a second, and clears the state where macOS refuses to draw an item at all. Measured on a
+  bar missing ten items: all ten returned, and relaunching the applications themselves had not
+  helped. Relaunching the application that owns the missing item sometimes works too.
 - **Control Centre's camera button is not drawn while items are hidden**, and no allowlist brings
   it back. Ice draws one of its own, and clicking it opens the real controls. That costs about a
   quarter of a second with hiding lifted, because the module it presses does not exist while
@@ -109,3 +109,4 @@ have to grant Accessibility and Screen Recording to your own build again, for th
 Please report on [PR #995](https://github.com/jordanbaird/Ice/pull/995) rather than on Ice's issue
 tracker. This build is not the maintainer's work, and issues about it would land on him.
 Ice is GPLv3; the source of this build is the branch linked at the top.
+
