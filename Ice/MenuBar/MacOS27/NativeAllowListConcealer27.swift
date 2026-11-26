@@ -52,15 +52,22 @@ final class NativeAllowListConcealer27 {
         Preferences.shared != nil && (try? Preferences.read()) != nil
     }
 
-    /// Whether writes to MenuBarAgent's preferences synchronize again.
+    /// Whether Ice can reach MenuBarAgent's preferences again, tested without writing anything.
     ///
-    /// Reading is not enough to tell: with Full Disk Access taken away while Ice runs, the list
-    /// still reads but no write synchronizes (measured 2026-11-26). The test is a write of its
-    /// own (see ``Preferences/canSynchronize()``): writing the list back would risk two things —
-    /// an identical value may synchronize without reaching cfprefsd at all, and the copy read
-    /// while access was gone may be stale, undoing a switch the user changed in the meantime.
+    /// Reading through the preference calls is not enough to tell: with Full Disk Access taken
+    /// away while Ice runs, the list still reads, from this process's copy, but no write
+    /// synchronizes (measured 2026-11-26). Opening the preference file directly is checked by
+    /// macOS on every open, so it answers for the permission as it is now. Nothing is written:
+    /// a write of Ice's own into Control Center's preferences, tried every two seconds while
+    /// blocked, coincided with the Mac's appearance switching from dark to light (2026-11-26).
+    /// On success the preferences are synchronized once with nothing changed, so the next real
+    /// write starts from the list as it is now rather than the copy read while access was gone.
     static func canWrite() -> Bool {
-        Preferences.canSynchronize()
+        guard Preferences.canOpenFile() else {
+            return false
+        }
+        Preferences.refresh()
+        return true
     }
 
     /// Turns off the given applications that are tracked and allowed, and turns back on the ones
@@ -213,26 +220,26 @@ extension NativeAllowListConcealer27 {
             return array
         }
 
-        /// The key of the write test, which never holds anything but for the length of the test.
-        static let probeKey = "IceWriteProbe" as CFString
-
-        /// Writes a fresh value under ``probeKey``, synchronizes, then removes it and synchronizes
-        /// again. True only if both synchronized.
+        /// Whether this process may open the preference file itself, read-only.
         ///
-        /// A fresh value each time, so the write cannot pass as "unchanged" without cfprefsd
-        /// checking access. MenuBarAgent's own `trackedApplications` is never touched, and the
-        /// synchronize also refreshes this process's copy, so the next real write starts from the
-        /// list as it is now rather than as it was read while access was gone.
-        static func canSynchronize() -> Bool {
-            guard let shared else {
+        /// macOS checks the open against Full Disk Access each time (a denied open is what the
+        /// 2026-11-26 permission spikes measured), unlike reads through cfprefsd, which can be
+        /// answered from this process's copy. Nothing is read beyond the open.
+        static func canOpenFile() -> Bool {
+            let path = (container as String) + "/Library/Preferences/" + (applicationID as String) + ".plist"
+            guard let handle = FileHandle(forReadingAtPath: path) else {
                 return false
             }
-            let value = UUID().uuidString as CFString
-            shared.set(probeKey, value, applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
-            let wrote = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
-            shared.set(probeKey, nil, applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
-            let removed = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
-            return wrote && removed
+            try? handle.close()
+            return true
+        }
+
+        /// Synchronizes with nothing changed, so this process's copy is read afresh.
+        static func refresh() {
+            guard let shared else {
+                return
+            }
+            _ = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
         }
 
         static func write(_ array: [Any]) throws {
