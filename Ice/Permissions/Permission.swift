@@ -159,3 +159,37 @@ final class ScreenRecordingPermission: Permission {
         )
     }
 }
+
+// MARK: - FullDiskAccessPermission
+
+/// Full Disk Access, which the native hiding method needs on macOS 27.
+///
+/// MenuBarAgent keeps its "Allow in the Menu Bar" switches in the `group.com.apple.controlcenter`
+/// container, and macOS opens that container to other apps only with Full Disk Access: the
+/// narrower consent for another app's data is refused without asking (measured 2026-11-26). The
+/// check is the very read the native method needs, so "granted" means native hiding works.
+final class FullDiskAccessPermission: Permission {
+    /// The Full Disk Access pane of Privacy & Security.
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+
+    init() {
+        super.init(
+            title: "Full Disk Access",
+            details: [
+                "Hide apps with macOS's own Allow in the Menu Bar switch.",
+                "Without it, hidden items briefly show when you click the clock, Wi-Fi or battery.",
+            ],
+            isRequired: false,
+            settingsURL: Self.settingsURL,
+            check: {
+                if #available(macOS 27.0, *) {
+                    return NativeAllowListConcealer27.isAvailable
+                }
+                return true
+            },
+            request: {
+                // Full Disk Access cannot be requested; the user grants it in System Settings.
+            }
+        )
+    }
+}

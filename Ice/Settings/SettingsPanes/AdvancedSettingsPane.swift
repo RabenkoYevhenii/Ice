@@ -69,6 +69,9 @@ struct AdvancedSettingsPane: View {
                         + "native, including Focus and the camera indicator, and clicks on them need no reveal. "
                         + "While hidden, those apps show as not allowed in System Settings > Control Center."
                 )
+                if #available(macOS 27.0, *) {
+                    NativeHidingStatus27(concealer: appState.concealer27)
+                }
             case .assessmentMode:
                 Text(
                     "Uses assessment mode, which also removes Control Centre's modules and needs a brief "

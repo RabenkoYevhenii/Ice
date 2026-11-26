@@ -14,6 +14,7 @@ final class AppPermissions: ObservableObject {
     enum PermissionKey {
         case accessibility
         case screenRecording
+        case fullDiskAccess
     }
 
     /// The state of the app's granted permissions.
@@ -32,6 +33,9 @@ final class AppPermissions: ObservableObject {
     /// The permission for Screen Recording features.
     let screenRecording = ScreenRecordingPermission()
 
+    /// The permission the native hiding method needs on macOS 27.
+    let fullDiskAccess = FullDiskAccessPermission()
+
     /// The state of the app's granted permissions.
     @Published private(set) var permissionsState: PermissionsState = .missing
 
@@ -40,7 +44,10 @@ final class AppPermissions: ObservableObject {
 
     /// The permissions required for full app functionality.
     var allPermissions: [Permission] {
-        [accessibility, screenRecording]
+        if #available(macOS 27.0, *) {
+            return [accessibility, screenRecording, fullDiskAccess]
+        }
+        return [accessibility, screenRecording]
     }
 
     /// The permissions required for basic app functionality.
