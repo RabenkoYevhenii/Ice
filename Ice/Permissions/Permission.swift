@@ -24,6 +24,12 @@ class Permission: ObservableObject, Identifiable {
     /// A Boolean value that indicates if the app can work without this permission.
     let isRequired: Bool
 
+    /// Whether a grant only reads as granted once Ice has restarted (Screen Recording).
+    let takesEffectAfterRestart: Bool
+
+    /// Whether the user asked for this permission since Ice started.
+    @Published private(set) var wasRequested = false
+
     /// The URL of the settings pane to open.
     private let settingsURL: URL?
 
@@ -45,6 +51,7 @@ class Permission: ObservableObject, Identifiable {
     ///   - title: The title of the permission.
     ///   - details: Descriptive details for the permission.
     ///   - isRequired: A Boolean value that indicates if the app can work without this permission.
+    ///   - takesEffectAfterRestart: Whether a grant only reads as granted after a restart.
     ///   - settingsURL: The URL of the settings pane to open.
     ///   - check: A function that checks permissions.
     ///   - request: A function that requests permissions.
@@ -52,6 +59,7 @@ class Permission: ObservableObject, Identifiable {
         title: String,
         details: [String],
         isRequired: Bool,
+        takesEffectAfterRestart: Bool = false,
         settingsURL: URL?,
         check: @escaping () -> Bool,
         request: @escaping () -> Void
@@ -59,6 +67,7 @@ class Permission: ObservableObject, Identifiable {
         self.title = title
         self.details = details
         self.isRequired = isRequired
+        self.takesEffectAfterRestart = takesEffectAfterRestart
         self.settingsURL = settingsURL
         self.check = check
         self.request = request
@@ -81,6 +90,7 @@ class Permission: ObservableObject, Identifiable {
 
     /// Performs the request and opens the System Settings app to the appropriate pane.
     func performRequest() {
+        wasRequested = true
         request()
         if let settingsURL {
             NSWorkspace.shared.open(settingsURL)
@@ -149,6 +159,7 @@ final class ScreenRecordingPermission: Permission {
                 "Display images of individual menu bar items.",
             ],
             isRequired: false,
+            takesEffectAfterRestart: true,
             settingsURL: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"),
             check: {
                 ScreenCapture.checkPermissions()
@@ -178,6 +189,7 @@ final class FullDiskAccessPermission: Permission {
             details: [
                 "Hide apps with macOS's own Allow in the Menu Bar switch.",
                 "Without it, hidden items briefly show when you click the clock, Wi-Fi or battery.",
+                "Ice is not listed there by itself: click +, then choose Ice from Applications.",
             ],
             isRequired: false,
             settingsURL: Self.settingsURL,

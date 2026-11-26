@@ -99,6 +99,25 @@ after Screen Recording is never reached. User chose both layers.
 - [ ] **Step 4:** `swift test` green; xcodebuild `** BUILD SUCCEEDED **`.
 - [ ] **Step 5:** Commit.
 
+### Tasks 6–8 (added 2026-11-26 after the second live test; user chose all three)
+
+Found live: (a) Screen Recording only reads granted after a restart, so the window said "Continue in
+Limited Mode" with all three granted; (b) FDA revoked while Ice runs: reads keep working but every
+write fails `notSynchronized`, which never falls back, so the chevron is a silent no-op; (c) macOS
+does not list Ice in Full Disk Access by itself — the user must click + (Finder reveal rejected by
+the user: a highlighted app invites a double-click).
+
+**Interfaces:**
+- `PermissionsOnboarding27.shouldOfferRestart(requestedThisRun: Bool, granted: Bool) -> Bool` = `requestedThisRun && !granted`.
+- `struct NativeWriteHealth27 { static let threshold = 2; private(set) var consecutiveFailures = 0; var isBlocked: Bool; mutating func record(synchronized: Bool) }` — success resets to 0; blocked when failures ≥ threshold.
+- `Permission`: `let takesEffectAfterRestart: Bool` (Screen Recording true), `@Published private(set) var wasRequested` set by `performRequest()`.
+- `NativeAllowListConcealer27.canWrite() -> Bool`: reads the list and writes it back unchanged; true when the sync succeeds.
+
+**Task 6:** tests `restartOfferedAfterRequest` (true,false → true), `noRestartWhenGranted` (true,true → false), `noRestartWithoutRequest` (false,false → false); RED; implement; PermissionsView (macOS 27) replaces the Continue button with `Button("Restart Ice to Apply Screen Recording")` when the rule holds for any `takesEffectAfterRestart` permission; relaunch = detached `/bin/sh -c 'sleep 1; /usr/bin/open "$0"' <bundle path>` then `NSApp.terminate(nil)`.
+**Task 7:** tests `oneFailureIsNotBlocked`, `twoFailuresBlock`, `successUnblocks`; RED; implement; `Concealer27`: success → `record(true)`; `.notSynchronized` → `record(false)`, and when it becomes blocked log + `update()`; decision uses `nativeAvailable: nativeIsAvailable && !nativeWrites.isBlocked`; `recheckNativeAvailability()` while blocked tries `canWrite()` and on success records it, logs "writable again", clears `suspendedUntil`, `update()`.
+**Task 8:** FDA permission detail + warning text carry "In the list, click + and choose Ice from Applications."
+Each: `swift test` green, xcodebuild `** BUILD SUCCEEDED **`, commit.
+
 ### Task 4: Install and verify live
 
 Build command (from repo root):

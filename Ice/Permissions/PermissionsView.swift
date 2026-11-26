@@ -87,7 +87,13 @@ struct PermissionsView: View {
     private var footerView: some View {
         HStack {
             quitButton
-            continueButton
+            if #available(macOS 27.0, *) {
+                PermissionRestartButton27(permission: manager.screenRecording) {
+                    continueButton
+                }
+            } else {
+                continueButton
+            }
         }
         .controlSize(.large)
     }

@@ -20,4 +20,17 @@ enum PermissionsOnboarding27 {
     static func shouldReopen(hasRequired: Bool, hasAll: Bool, completed: Bool) -> Bool {
         hasRequired && !hasAll && !completed
     }
+
+    /// Whether to offer restarting Ice for a permission that only counts after a restart.
+    ///
+    /// Screen Recording reads as not granted until the app starts again, so the window used to say
+    /// "Continue in Limited Mode" with everything granted — and macOS's own quit-and-reopen does
+    /// not reopen a self-built Ice. Ice offers the restart itself instead.
+    ///
+    /// - Parameters:
+    ///   - requestedThisRun: Whether the user asked for the permission since Ice started.
+    ///   - granted: Whether the permission reads as granted now.
+    static func shouldOfferRestart(requestedThisRun: Bool, granted: Bool) -> Bool {
+        requestedThisRun && !granted
+    }
 }

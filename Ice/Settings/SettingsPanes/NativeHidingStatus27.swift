@@ -20,7 +20,8 @@ struct NativeHidingStatus27: View {
                 Label {
                     Text(
                         "Not in use: native hiding needs Full Disk Access, so assessment mode is used, and "
-                            + "clicks on system items briefly show hidden items."
+                            + "clicks on system items briefly show hidden items. Ice is not listed there by "
+                            + "itself: click +, then choose Ice from Applications."
                     )
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")

@@ -52,6 +52,18 @@ final class NativeAllowListConcealer27 {
         Preferences.shared != nil && (try? Preferences.read()) != nil
     }
 
+    /// Whether a write to MenuBarAgent's list synchronizes, tested by writing it back unchanged.
+    ///
+    /// Reading is not enough to tell: with Full Disk Access taken away while Ice runs, the list
+    /// still reads but no write synchronizes (measured 2026-11-26). Writing the same contents back
+    /// changes no switch, so it is safe to try while the switch is out of reach.
+    static func canWrite() -> Bool {
+        guard let array = try? Preferences.read() else {
+            return false
+        }
+        return (try? Preferences.write(array)) != nil
+    }
+
     /// Turns off the given applications that are tracked and allowed, and turns back on the ones
     /// Ice turned off earlier that are no longer among them.
     ///

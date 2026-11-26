@@ -52,6 +52,9 @@ final class Concealer27: ObservableObject {
     /// effect without a restart.
     private var nativeRecheck: AnyCancellable?
 
+    /// Whether writes through the native switch still synchronize (see ``NativeWriteHealth27``).
+    private var nativeWrites = NativeWriteHealth27()
+
     /// The method in force since the last ``update()``.
     private var backend = Backend.assessment {
         didSet {
@@ -163,7 +166,7 @@ final class Concealer27: ObservableObject {
     private func resolvedBackend(_ appState: AppState) -> Backend {
         let decision = HidingBackendChoice27.decide(
             nativeSelected: appState.settings.advanced.macOS27HidingMethod == .nativeAllowList,
-            nativeAvailable: nativeIsAvailable,
+            nativeAvailable: nativeIsAvailable && !nativeWrites.isBlocked,
             nativeFailed: nativeFailed
         )
         if nativeUnavailable != decision.warnNativeUnavailable {
@@ -176,8 +179,19 @@ final class Concealer27: ObservableObject {
     ///
     /// Runs every two seconds while the switch is chosen but not in force. Only a change of
     /// readability acts: a switch that stays readable after a failed apply is not retried here,
-    /// or a failure with another cause would be retried every two seconds.
+    /// or a failure with another cause would be retried every two seconds. The exception is a
+    /// switch blocked by failed syncs, where reading keeps working: there a write is tried.
     func recheckNativeAvailability() {
+        if nativeWrites.isBlocked {
+            guard NativeAllowListConcealer27.canWrite() else {
+                return
+            }
+            nativeWrites.record(synchronized: true)
+            logger.notice("The native Allow in the Menu Bar switch is writable again, so it is used")
+            suspendedUntil = nil
+            update()
+            return
+        }
         let available = NativeAllowListConcealer27.isAvailable
         guard available != nativeIsAvailable else {
             return
@@ -192,6 +206,18 @@ final class Concealer27: ObservableObject {
         // A lift in progress belongs to assessment mode; the backend starts clean, as on a change
         // of the hiding method.
         suspendedUntil = nil
+        update()
+    }
+
+    /// Counts a write that did not synchronize, and gives the switch up once that has happened
+    /// often enough in a row — until a write synchronizes again (see ``recheckNativeAvailability()``).
+    private func recordFailedSync() {
+        let wasBlocked = nativeWrites.isBlocked
+        nativeWrites.record(synchronized: false)
+        guard nativeWrites.isBlocked, !wasBlocked else {
+            return
+        }
+        logger.notice("Native switch writes keep failing, so assessment mode is used until one synchronizes")
         update()
     }
 
@@ -413,16 +439,20 @@ final class Concealer27: ObservableObject {
                 do {
                     let untracked = try native.apply(concealed: concealed)
                     self?.untrackedConcealed = untracked
+                    self?.nativeWrites.record(synchronized: true)
                 } catch {
                     logger.error("Could not apply concealment through the native switch: \(error, privacy: .public)")
                     // A switch that cannot be found or read now will not be in a moment either, so
-                    // assessment mode takes over for the rest of the run. A write that did not
-                    // synchronize is tried again at the next change.
+                    // assessment mode takes over. A write that did not synchronize is tried again
+                    // at the next change, until it has failed often enough to mean the switch is
+                    // out of reach — which is what taking Full Disk Access away looks like.
                     switch error as? NativeAllowListConcealer27.Failure {
                     case .unavailable, .unreadable:
                         self?.nativeFailed = true
                         self?.update()
-                    default:
+                    case .notSynchronized:
+                        self?.recordFailedSync()
+                    case nil:
                         break
                     }
                 }
