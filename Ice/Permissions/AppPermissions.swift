@@ -45,7 +45,9 @@ final class AppPermissions: ObservableObject {
     /// The permissions required for full app functionality.
     var allPermissions: [Permission] {
         if #available(macOS 27.0, *) {
-            return [accessibility, screenRecording, fullDiskAccess]
+            // Screen Recording last: granting it makes macOS offer to quit and reopen Ice, and
+            // anything listed after it was lost when the reopen did not happen.
+            return [accessibility, fullDiskAccess, screenRecording]
         }
         return [accessibility, screenRecording]
     }

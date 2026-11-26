@@ -79,6 +79,26 @@
 - [ ] **Step 4: Build** (Task 4 command) — expected `** BUILD SUCCEEDED **`.
 - [ ] **Step 5: Commit** the three files: `fix(macos27): ask for Full Disk Access and show when native hiding is not in force`.
 
+### Task 5: Onboarding cannot lose the FDA step (added 2026-11-26 after live test)
+
+Found live: Screen Recording's "Quit & Reopen" quits the app and (for a self-built app) does not
+reopen it; the permissions window only reappears for missing *required* permissions, so FDA listed
+after Screen Recording is never reached. User chose both layers.
+
+**Files:**
+- Create: `Ice/MenuBar/MacOS27/Core/PermissionsOnboarding27.swift`; Test: `Tests/IceMacOS27CoreTests/PermissionsOnboarding27Tests.swift`
+- Modify: `Ice/Permissions/AppPermissions.swift` (order), `Ice/Utilities/Defaults.swift` (key),
+  `Ice/Permissions/PermissionsView.swift` (Continue sets the key), `Ice/Main/AppDelegate.swift` (`.hasRequired` case)
+
+**Interfaces:**
+- Produces: `enum PermissionsOnboarding27 { static func shouldReopen(hasRequired: Bool, hasAll: Bool, completed: Bool) -> Bool }` — true only when `hasRequired && !hasAll && !completed`; `Defaults.Key.permissionsOnboardingCompleted = "PermissionsOnboardingCompleted"`.
+
+- [ ] **Step 1: Failing tests** `interruptedReopens` (true,false,false → true), `completedNeverReopens` (true,false,true → false), `allGrantedNeverReopens` (true,true,false → false), `missingRequiredIsNotThisRule` (false,false,false → false; the existing `.missing` path already shows the window).
+- [ ] **Step 2:** `swift test --filter PermissionsOnboarding27` → FAIL (not in scope).
+- [ ] **Step 3:** Implement; order on macOS 27 = `[accessibility, fullDiskAccess, screenRecording]` (restart-forcing grant last); Continue sets the key `true`; `.hasRequired` on macOS 27 with `shouldReopen` → `performSetup(hasPermissions: true)` then open the permissions window (activate `.regular`, as the `.missing` path does).
+- [ ] **Step 4:** `swift test` green; xcodebuild `** BUILD SUCCEEDED **`.
+- [ ] **Step 5:** Commit.
+
 ### Task 4: Install and verify live
 
 Build command (from repo root):

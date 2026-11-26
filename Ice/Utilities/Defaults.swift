@@ -169,6 +169,7 @@ extension Defaults {
         // MARK: macOS 27
         case macOS27Layout = "MacOS27Layout"
         case macOS27LayoutSeeded = "MacOS27LayoutSeeded"
+        case permissionsOnboardingCompleted = "PermissionsOnboardingCompleted"
         case showCaptureIndicator = "ShowCaptureIndicator"
         case macOS27MenuReach = "MacOS27MenuReach"
         case macOS27MenuOwner = "MacOS27MenuOwner"
