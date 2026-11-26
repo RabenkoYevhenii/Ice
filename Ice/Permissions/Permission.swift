@@ -88,8 +88,17 @@ class Permission: ObservableObject, Identifiable {
             }
     }
 
+    /// Runs the once-a-second check again, so a grant or revocation made while Ice runs shows.
+    ///
+    /// Checks stop once setup is done; a view that shows the permission's state restarts them
+    /// while it is on screen, and a request restarts them so the user sees the answer.
+    func startCheck() {
+        configureCancellables()
+    }
+
     /// Performs the request and opens the System Settings app to the appropriate pane.
     func performRequest() {
+        startCheck()
         wasRequested = true
         request()
         if let settingsURL {

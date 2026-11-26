@@ -191,23 +191,41 @@ struct AdvancedSettingsPane: View {
     @ViewBuilder
     private var allPermissions: some View {
         ForEach(appState.permissions.allPermissions) { permission in
-            LabeledContent {
-                if permission.hasPermission {
-                    Label {
-                        Text("Permission Granted")
-                    } icon: {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundStyle(.green)
-                    }
-                } else {
-                    Button("Grant Permission") {
-                        permission.performRequest()
-                    }
+            PermissionStatusRow(permission: permission)
+        }
+    }
+}
+
+/// One permission's state in Settings, kept current while it is on screen.
+///
+/// The pane observes only its settings, and permission checks stop after setup, so a grant made
+/// while Ice ran used to leave "Grant Permission" showing until a relaunch — right below the
+/// macOS 27 hiding warning that had already cleared.
+private struct PermissionStatusRow: View {
+    @ObservedObject var permission: Permission
+
+    var body: some View {
+        LabeledContent {
+            if permission.hasPermission {
+                Label {
+                    Text("Permission Granted")
+                } icon: {
+                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(.green)
                 }
-            } label: {
-                Text(permission.title)
+            } else {
+                Button("Grant Permission") {
+                    permission.performRequest()
+                }
             }
-            .frame(height: 22)
+        } label: {
+            Text(permission.title)
+        }
+        .frame(height: 22)
+        .onAppear {
+            // Not stopped on disappear: the permissions window may be waiting on the same check
+            // (`waitForPermission`), and stopping it would leave that wait hanging.
+            permission.startCheck()
         }
     }
 }

@@ -52,16 +52,15 @@ final class NativeAllowListConcealer27 {
         Preferences.shared != nil && (try? Preferences.read()) != nil
     }
 
-    /// Whether a write to MenuBarAgent's list synchronizes, tested by writing it back unchanged.
+    /// Whether writes to MenuBarAgent's preferences synchronize again.
     ///
     /// Reading is not enough to tell: with Full Disk Access taken away while Ice runs, the list
-    /// still reads but no write synchronizes (measured 2026-11-26). Writing the same contents back
-    /// changes no switch, so it is safe to try while the switch is out of reach.
+    /// still reads but no write synchronizes (measured 2026-11-26). The test is a write of its
+    /// own (see ``Preferences/canSynchronize()``): writing the list back would risk two things —
+    /// an identical value may synchronize without reaching cfprefsd at all, and the copy read
+    /// while access was gone may be stale, undoing a switch the user changed in the meantime.
     static func canWrite() -> Bool {
-        guard let array = try? Preferences.read() else {
-            return false
-        }
-        return (try? Preferences.write(array)) != nil
+        Preferences.canSynchronize()
     }
 
     /// Turns off the given applications that are tracked and allowed, and turns back on the ones
@@ -212,6 +211,28 @@ extension NativeAllowListConcealer27 {
                 throw Failure.unreadable
             }
             return array
+        }
+
+        /// The key of the write test, which never holds anything but for the length of the test.
+        static let probeKey = "IceWriteProbe" as CFString
+
+        /// Writes a fresh value under ``probeKey``, synchronizes, then removes it and synchronizes
+        /// again. True only if both synchronized.
+        ///
+        /// A fresh value each time, so the write cannot pass as "unchanged" without cfprefsd
+        /// checking access. MenuBarAgent's own `trackedApplications` is never touched, and the
+        /// synchronize also refreshes this process's copy, so the next real write starts from the
+        /// list as it is now rather than as it was read while access was gone.
+        static func canSynchronize() -> Bool {
+            guard let shared else {
+                return false
+            }
+            let value = UUID().uuidString as CFString
+            shared.set(probeKey, value, applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
+            let wrote = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
+            shared.set(probeKey, nil, applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
+            let removed = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
+            return wrote && removed
         }
 
         static func write(_ array: [Any]) throws {

@@ -3,6 +3,7 @@
 //  Ice
 //
 
+import OSLog
 import SwiftUI
 
 /// Shows "Restart Ice" in place of the Continue button while a permission waits for a restart.
@@ -32,17 +33,16 @@ struct PermissionRestartButton27<Fallback: View>: View {
         }
     }
 
-    /// Quits Ice and opens it again.
-    ///
-    /// A running app cannot open itself again, so a short-lived shell does it a second after Ice
-    /// has gone.
+    /// Quits Ice and opens it again, once this instance has gone (see ``SelfRelaunch27``).
     private static func relaunch() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", Bundle.main.bundleURL.path]
+        process.arguments = SelfRelaunch27.arguments(bundlePath: Bundle.main.bundleURL.path, opener: "/usr/bin/open")
         do {
             try process.run()
         } catch {
+            // Without the helper nothing would open Ice again, so Ice stays running.
+            Logger(category: "Permissions").error("Could not start the restart helper: \(error, privacy: .public)")
             return
         }
         NSApp.terminate(nil)
