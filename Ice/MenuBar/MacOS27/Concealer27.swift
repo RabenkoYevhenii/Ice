@@ -35,12 +35,22 @@ final class Concealer27: ObservableObject {
     private let controller = ConcealmentController27(backend: MenuBarAssessmentAssertion27())
     private let native = NativeAllowListConcealer27()
 
-    /// Whether the native switch can be read and written, checked once at setup.
+    /// Whether the native switch can be read and written: checked at setup, and again every
+    /// two seconds while it is chosen but not in force (see ``recheckNativeAvailability()``).
     private var nativeIsAvailable = false
 
-    /// Set when the native switch failed in a way that will not mend itself in this run, so
-    /// concealment falls back to assessment mode rather than leave everything shown.
+    /// Set when the native switch failed in a way that will not mend itself on its own, so
+    /// concealment falls back to assessment mode rather than leave everything shown. Cleared
+    /// when the switch turns readable again, which is what granting Full Disk Access does.
     private var nativeFailed = false
+
+    /// Whether the user chose the native switch but it is not in force, so Settings can say so
+    /// rather than fall back to assessment mode silently (see ``HidingBackendChoice27``).
+    @Published private(set) var nativeUnavailable = false
+
+    /// The re-check that runs while ``nativeUnavailable``, so granting Full Disk Access takes
+    /// effect without a restart.
+    private var nativeRecheck: AnyCancellable?
 
     /// The method in force since the last ``update()``.
     private var backend = Backend.assessment {
@@ -151,14 +161,38 @@ final class Concealer27: ObservableObject {
 
     /// The method to apply, from the setting and what this system allows.
     private func resolvedBackend(_ appState: AppState) -> Backend {
-        guard
-            appState.settings.advanced.macOS27HidingMethod == .nativeAllowList,
-            nativeIsAvailable,
-            !nativeFailed
-        else {
-            return .assessment
+        let decision = HidingBackendChoice27.decide(
+            nativeSelected: appState.settings.advanced.macOS27HidingMethod == .nativeAllowList,
+            nativeAvailable: nativeIsAvailable,
+            nativeFailed: nativeFailed
+        )
+        if nativeUnavailable != decision.warnNativeUnavailable {
+            nativeUnavailable = decision.warnNativeUnavailable
         }
-        return .native
+        return decision.backend == .native ? .native : .assessment
+    }
+
+    /// Reads the native switch again and applies what changed.
+    ///
+    /// Runs every two seconds while the switch is chosen but not in force. Only a change of
+    /// readability acts: a switch that stays readable after a failed apply is not retried here,
+    /// or a failure with another cause would be retried every two seconds.
+    func recheckNativeAvailability() {
+        let available = NativeAllowListConcealer27.isAvailable
+        guard available != nativeIsAvailable else {
+            return
+        }
+        nativeIsAvailable = available
+        if available {
+            nativeFailed = false
+            logger.notice("The native Allow in the Menu Bar switch is readable now, so it is used")
+        } else {
+            logger.notice("The native Allow in the Menu Bar switch is no longer readable")
+        }
+        // A lift in progress belongs to assessment mode; the backend starts clean, as on a change
+        // of the hiding method.
+        suspendedUntil = nil
+        update()
     }
 
     func performSetup(with appState: AppState) {
@@ -275,7 +309,35 @@ final class Concealer27: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        observeNativeAvailability()
         update()
+    }
+
+    /// Re-checks the native switch every two seconds while it is chosen but not in force, and
+    /// not at all otherwise, so a working setup pays nothing for it.
+    private func observeNativeAvailability() {
+        $nativeUnavailable
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] unavailable in
+                MainActor.assumeIsolated {
+                    guard let self else {
+                        return
+                    }
+                    guard unavailable else {
+                        self.nativeRecheck = nil
+                        return
+                    }
+                    self.nativeRecheck = Timer.publish(every: 2, on: .main, in: .common)
+                        .autoconnect()
+                        .sink { [weak self] _ in
+                            MainActor.assumeIsolated {
+                                self?.recheckNativeAvailability()
+                            }
+                        }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// Derives what to conceal from Ice's sections and applies it.
