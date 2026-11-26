@@ -52,6 +52,24 @@ final class NativeAllowListConcealer27 {
         Preferences.shared != nil && (try? Preferences.read()) != nil
     }
 
+    /// Whether Ice can reach MenuBarAgent's preferences again, tested without writing anything.
+    ///
+    /// Reading through the preference calls is not enough to tell: with Full Disk Access taken
+    /// away while Ice runs, the list still reads, from this process's copy, but no write
+    /// synchronizes (measured 2026-11-26). Opening the preference file directly is checked by
+    /// macOS on every open, so it answers for the permission as it is now. Nothing is written:
+    /// a write of Ice's own into Control Center's preferences, tried every two seconds while
+    /// blocked, coincided with the Mac's appearance switching from dark to light (2026-11-26).
+    /// On success the preferences are synchronized once with nothing changed, so the next real
+    /// write starts from the list as it is now rather than the copy read while access was gone.
+    static func canWrite() -> Bool {
+        guard Preferences.canOpenFile() else {
+            return false
+        }
+        Preferences.refresh()
+        return true
+    }
+
     /// Turns off the given applications that are tracked and allowed, and turns back on the ones
     /// Ice turned off earlier that are no longer among them.
     ///
@@ -200,6 +218,28 @@ extension NativeAllowListConcealer27 {
                 throw Failure.unreadable
             }
             return array
+        }
+
+        /// Whether this process may open the preference file itself, read-only.
+        ///
+        /// macOS checks the open against Full Disk Access each time (a denied open is what the
+        /// 2026-11-26 permission spikes measured), unlike reads through cfprefsd, which can be
+        /// answered from this process's copy. Nothing is read beyond the open.
+        static func canOpenFile() -> Bool {
+            let path = (container as String) + "/Library/Preferences/" + (applicationID as String) + ".plist"
+            guard let handle = FileHandle(forReadingAtPath: path) else {
+                return false
+            }
+            try? handle.close()
+            return true
+        }
+
+        /// Synchronizes with nothing changed, so this process's copy is read afresh.
+        static func refresh() {
+            guard let shared else {
+                return
+            }
+            _ = shared.synchronize(applicationID, kCFPreferencesCurrentUser, kCFPreferencesAnyHost, container)
         }
 
         static func write(_ array: [Any]) throws {

@@ -35,12 +35,41 @@ final class Concealer27: ObservableObject {
     private let controller = ConcealmentController27(backend: MenuBarAssessmentAssertion27())
     private let native = NativeAllowListConcealer27()
 
-    /// Whether the native switch can be read and written, checked once at setup.
+    /// Whether the native switch can be read and written: checked at setup, and again every
+    /// two seconds while it is chosen but not in force (see ``recheckNativeAvailability()``).
     private var nativeIsAvailable = false
 
-    /// Set when the native switch failed in a way that will not mend itself in this run, so
-    /// concealment falls back to assessment mode rather than leave everything shown.
+    /// Set when the native switch failed in a way that will not mend itself on its own, so
+    /// concealment falls back to assessment mode rather than leave everything shown. Cleared
+    /// when the switch turns readable again, which is what granting Full Disk Access does.
     private var nativeFailed = false
+
+    /// Whether the user chose the native switch but it is not in force, so Settings can say so
+    /// rather than fall back to assessment mode silently (see ``HidingBackendChoice27``).
+    @Published private(set) var nativeUnavailable = false
+
+    /// The re-check that runs while ``nativeUnavailable``, so granting Full Disk Access takes
+    /// effect without a restart.
+    private var nativeRecheck: AnyCancellable?
+
+    /// Whether writes through the native switch still synchronize (see ``NativeWriteHealth27``).
+    private var nativeWrites = NativeWriteHealth27() {
+        didSet {
+            let isBlocked = nativeWrites.isBlocked
+            Self.nativeWritesBlockedSnapshot.withLock { $0 = isBlocked }
+        }
+    }
+
+    /// ``nativeWrites``' blocked state, for the Full Disk Access check, which runs outside the
+    /// main actor: reads keep working after the permission is taken away, so a check that only
+    /// reads would go on saying "granted" while nothing can be written.
+    nonisolated static let nativeWritesBlockedSnapshot = OSAllocatedUnfairLock(initialState: false)
+
+    /// Whether the native switch was in force at some point since launch.
+    private var nativeWorkedThisRun = false
+
+    /// Whether the current loss of native access was already prompted for.
+    private var promptedForLostAccess = false
 
     /// The method in force since the last ``update()``.
     private var backend = Backend.assessment {
@@ -151,14 +180,76 @@ final class Concealer27: ObservableObject {
 
     /// The method to apply, from the setting and what this system allows.
     private func resolvedBackend(_ appState: AppState) -> Backend {
-        guard
-            appState.settings.advanced.macOS27HidingMethod == .nativeAllowList,
-            nativeIsAvailable,
-            !nativeFailed
-        else {
-            return .assessment
+        let decision = HidingBackendChoice27.decide(
+            nativeSelected: appState.settings.advanced.macOS27HidingMethod == .nativeAllowList,
+            nativeAvailable: nativeIsAvailable && !nativeWrites.isBlocked,
+            nativeFailed: nativeFailed
+        )
+        if nativeUnavailable != decision.warnNativeUnavailable {
+            nativeUnavailable = decision.warnNativeUnavailable
         }
-        return .native
+        if decision.backend == .native {
+            nativeWorkedThisRun = true
+            promptedForLostAccess = false
+        } else if PermissionsOnboarding27.shouldPromptForLostAccess(
+            nativeWorkedThisRun: nativeWorkedThisRun,
+            nowWarns: decision.warnNativeUnavailable,
+            alreadyPrompted: promptedForLostAccess
+        ) {
+            promptedForLostAccess = true
+            logger.notice("Native hiding lost its access, so the permissions window opens")
+            Task {
+                appState.activate(withPolicy: .regular)
+                appState.openWindow(.permissions)
+            }
+        }
+        return decision.backend == .native ? .native : .assessment
+    }
+
+    /// Reads the native switch again and applies what changed.
+    ///
+    /// Runs every two seconds while the switch is chosen but not in force. Only a change of
+    /// readability acts: a switch that stays readable after a failed apply is not retried here,
+    /// or a failure with another cause would be retried every two seconds. The exception is a
+    /// switch blocked by failed syncs, where reading keeps working: there a write is tried.
+    func recheckNativeAvailability() {
+        if nativeWrites.isBlocked {
+            guard NativeAllowListConcealer27.canWrite() else {
+                return
+            }
+            nativeWrites.record(synchronized: true)
+            logger.notice("The native Allow in the Menu Bar switch is writable again, so it is used")
+            suspendedUntil = nil
+            update()
+            return
+        }
+        let available = NativeAllowListConcealer27.isAvailable
+        guard available != nativeIsAvailable else {
+            return
+        }
+        nativeIsAvailable = available
+        if available {
+            nativeFailed = false
+            logger.notice("The native Allow in the Menu Bar switch is readable now, so it is used")
+        } else {
+            logger.notice("The native Allow in the Menu Bar switch is no longer readable")
+        }
+        // A lift in progress belongs to assessment mode; the backend starts clean, as on a change
+        // of the hiding method.
+        suspendedUntil = nil
+        update()
+    }
+
+    /// Counts a write that did not synchronize, and gives the switch up once that has happened
+    /// often enough in a row — until a write synchronizes again (see ``recheckNativeAvailability()``).
+    private func recordFailedSync() {
+        let wasBlocked = nativeWrites.isBlocked
+        nativeWrites.record(synchronized: false)
+        guard nativeWrites.isBlocked, !wasBlocked else {
+            return
+        }
+        logger.notice("Native switch writes keep failing, so assessment mode is used until one synchronizes")
+        update()
     }
 
     func performSetup(with appState: AppState) {
@@ -275,7 +366,35 @@ final class Concealer27: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        observeNativeAvailability()
         update()
+    }
+
+    /// Re-checks the native switch every two seconds while it is chosen but not in force, and
+    /// not at all otherwise, so a working setup pays nothing for it.
+    private func observeNativeAvailability() {
+        $nativeUnavailable
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] unavailable in
+                MainActor.assumeIsolated {
+                    guard let self else {
+                        return
+                    }
+                    guard unavailable else {
+                        self.nativeRecheck = nil
+                        return
+                    }
+                    self.nativeRecheck = Timer.publish(every: 2, on: .main, in: .common)
+                        .autoconnect()
+                        .sink { [weak self] _ in
+                            MainActor.assumeIsolated {
+                                self?.recheckNativeAvailability()
+                            }
+                        }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// Derives what to conceal from Ice's sections and applies it.
@@ -351,16 +470,20 @@ final class Concealer27: ObservableObject {
                 do {
                     let untracked = try native.apply(concealed: concealed)
                     self?.untrackedConcealed = untracked
+                    self?.nativeWrites.record(synchronized: true)
                 } catch {
                     logger.error("Could not apply concealment through the native switch: \(error, privacy: .public)")
                     // A switch that cannot be found or read now will not be in a moment either, so
-                    // assessment mode takes over for the rest of the run. A write that did not
-                    // synchronize is tried again at the next change.
+                    // assessment mode takes over. A write that did not synchronize is tried again
+                    // at the next change, until it has failed often enough to mean the switch is
+                    // out of reach — which is what taking Full Disk Access away looks like.
                     switch error as? NativeAllowListConcealer27.Failure {
                     case .unavailable, .unreadable:
                         self?.nativeFailed = true
                         self?.update()
-                    default:
+                    case .notSynchronized:
+                        self?.recordFailedSync()
+                    case nil:
                         break
                     }
                 }

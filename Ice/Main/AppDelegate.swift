@@ -53,6 +53,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .hasRequired:
             appState.permissions.logger.debug("Passed required permissions checks")
             appState.performSetup(hasPermissions: true)
+            if
+                #available(macOS 27.0, *),
+                PermissionsOnboarding27.shouldReopen(
+                    hasRequired: true,
+                    hasAll: false,
+                    completed: Defaults.bool(forKey: .permissionsOnboardingCompleted)
+                )
+            {
+                appState.permissions.logger.notice("Onboarding was not finished, so the permissions window opens again")
+                Task {
+                    // Delayed like the window for missing permissions, to keep clear of the delegate.
+                    try? await Task.sleep(for: .milliseconds(100))
+                    appState.activate(withPolicy: .regular)
+                    appState.openWindow(.permissions)
+                }
+            }
         case .missing:
             appState.permissions.logger.debug("Failed required permissions checks")
             appState.performSetup(hasPermissions: false)

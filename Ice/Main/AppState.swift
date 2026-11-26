@@ -269,6 +269,8 @@ final class AppState: ObservableObject {
             permissions.accessibility.hasPermission
         case .screenRecording:
             permissions.screenRecording.hasPermission
+        case .fullDiskAccess:
+            permissions.fullDiskAccess.hasPermission
         }
     }
 
