@@ -199,12 +199,16 @@ final class FullDiskAccessPermission: Permission {
                 "Hide apps with macOS's own Allow in the Menu Bar switch.",
                 "Without it, hidden items briefly show when you click the clock, Wi-Fi or battery.",
                 "Ice is not listed there by itself: click +, then choose Ice from Applications.",
+                "If Ice loses it while running, hidden items cannot be shown until it is back.",
             ],
             isRequired: false,
             settingsURL: Self.settingsURL,
             check: {
                 if #available(macOS 27.0, *) {
+                    // Reads keep working after the permission is taken away, so "granted" also
+                    // needs writes not to be failing.
                     return NativeAllowListConcealer27.isAvailable
+                        && !Concealer27.nativeWritesBlockedSnapshot.withLock { $0 }
                 }
                 return true
             },

@@ -53,7 +53,23 @@ final class Concealer27: ObservableObject {
     private var nativeRecheck: AnyCancellable?
 
     /// Whether writes through the native switch still synchronize (see ``NativeWriteHealth27``).
-    private var nativeWrites = NativeWriteHealth27()
+    private var nativeWrites = NativeWriteHealth27() {
+        didSet {
+            let isBlocked = nativeWrites.isBlocked
+            Self.nativeWritesBlockedSnapshot.withLock { $0 = isBlocked }
+        }
+    }
+
+    /// ``nativeWrites``' blocked state, for the Full Disk Access check, which runs outside the
+    /// main actor: reads keep working after the permission is taken away, so a check that only
+    /// reads would go on saying "granted" while nothing can be written.
+    nonisolated static let nativeWritesBlockedSnapshot = OSAllocatedUnfairLock(initialState: false)
+
+    /// Whether the native switch was in force at some point since launch.
+    private var nativeWorkedThisRun = false
+
+    /// Whether the current loss of native access was already prompted for.
+    private var promptedForLostAccess = false
 
     /// The method in force since the last ``update()``.
     private var backend = Backend.assessment {
@@ -171,6 +187,21 @@ final class Concealer27: ObservableObject {
         )
         if nativeUnavailable != decision.warnNativeUnavailable {
             nativeUnavailable = decision.warnNativeUnavailable
+        }
+        if decision.backend == .native {
+            nativeWorkedThisRun = true
+            promptedForLostAccess = false
+        } else if PermissionsOnboarding27.shouldPromptForLostAccess(
+            nativeWorkedThisRun: nativeWorkedThisRun,
+            nowWarns: decision.warnNativeUnavailable,
+            alreadyPrompted: promptedForLostAccess
+        ) {
+            promptedForLostAccess = true
+            logger.notice("Native hiding lost its access, so the permissions window opens")
+            Task {
+                appState.activate(withPolicy: .regular)
+                appState.openWindow(.permissions)
+            }
         }
         return decision.backend == .native ? .native : .assessment
     }

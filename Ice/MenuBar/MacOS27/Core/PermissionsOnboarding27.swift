@@ -33,4 +33,19 @@ enum PermissionsOnboarding27 {
     static func shouldOfferRestart(requestedThisRun: Bool, granted: Bool) -> Bool {
         requestedThisRun && !granted
     }
+
+    /// Whether to open the permissions window because native hiding lost its access mid-run.
+    ///
+    /// Without Full Disk Access the switches Ice turned off cannot be turned back on, so the
+    /// hidden items stay hidden whatever the chevron does — and the only remedy is the permission
+    /// (measured 2026-11-26). A warning in Settings is not enough there: nobody opens Settings to
+    /// find out why the menu bar stopped working. Once per loss, so it never nags.
+    ///
+    /// - Parameters:
+    ///   - nativeWorkedThisRun: Whether the native switch was in force at some point since launch.
+    ///   - nowWarns: Whether the native switch is chosen but not in force now.
+    ///   - alreadyPrompted: Whether this loss was already prompted for.
+    static func shouldPromptForLostAccess(nativeWorkedThisRun: Bool, nowWarns: Bool, alreadyPrompted: Bool) -> Bool {
+        nativeWorkedThisRun && nowWarns && !alreadyPrompted
+    }
 }

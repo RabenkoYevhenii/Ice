@@ -41,3 +41,26 @@ struct PermissionsOnboarding27RestartTests {
         #expect(!PermissionsOnboarding27.shouldOfferRestart(requestedThisRun: false, granted: false))
     }
 }
+
+@Suite("PermissionsOnboarding27 lost access")
+struct PermissionsOnboarding27LostAccessTests {
+    @Test("Losing native access after it worked opens the permissions window")
+    func lostAfterWorkingPrompts() {
+        #expect(PermissionsOnboarding27.shouldPromptForLostAccess(nativeWorkedThisRun: true, nowWarns: true, alreadyPrompted: false))
+    }
+
+    @Test("A loss already prompted for is not prompted again")
+    func promptedOnce() {
+        #expect(!PermissionsOnboarding27.shouldPromptForLostAccess(nativeWorkedThisRun: true, nowWarns: true, alreadyPrompted: true))
+    }
+
+    @Test("Never having had access is onboarding's job, not this prompt")
+    func neverWorkedDoesNotPrompt() {
+        #expect(!PermissionsOnboarding27.shouldPromptForLostAccess(nativeWorkedThisRun: false, nowWarns: true, alreadyPrompted: false))
+    }
+
+    @Test("No loss, no prompt")
+    func noLossNoPrompt() {
+        #expect(!PermissionsOnboarding27.shouldPromptForLostAccess(nativeWorkedThisRun: true, nowWarns: false, alreadyPrompted: false))
+    }
+}
